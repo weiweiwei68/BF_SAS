@@ -143,6 +143,7 @@ class SecurityAlarm(BaseSolution):
         for box, cls in zip(self.boxes, self.clss):
             # Draw bounding box
             annotator.box_label(box, label=self.names[cls], color=colors(cls, True))
+            print(f"Box coordinates: {box}, Class: {self.names[cls]}")
 
         total_det = len(self.clss)
         if total_det >= self.records and not self.email_sent:  # Only send email if not sent before
