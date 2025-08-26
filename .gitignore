@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Untrack tasks in dev branch
+area_detection/
+
 # C extensions
 *.so
 
