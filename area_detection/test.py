@@ -1,12 +1,12 @@
 import cv2
 from ultralytics.utils.plotting import Annotator
 from ultralytics import solutions
-from roi import RegionOfInterest
+from ultralytics.solutions.roi import RegionOfInterest
 import numpy as np
 import torch
+from ultralytics.solutions.mask import MaskedRegion
 
-# Initialize the Region of Interest (ROI) manager
-roi_manager = RegionOfInterest()
+
 
 # Load a frame for processing
 # For testing purposes, you can replace the path with your own image or video frame.
@@ -16,6 +16,14 @@ if not cap.isOpened():
     raise IOError("Error opening video stream or file")
 ret, im0 = cap.read()
 img_disp = im0.copy()
+# Initialize the Region of Interest (ROI) manager
+roi_manager = solutions.AreaInvasion(
+        image=im0,
+        show=True,  # display the output
+        model="yolo11n.pt",  # i.e. yolo11s.pt, yolo11m.pt
+        records=1,  # total detections count to send an email
+        classes=[0],  # i.e. [0] for person, [0, 1] for person and car, etc.
+    )
 
 # Operate the ROI
 WIN = "Select Area (L-click add, R-click close, Enter finish, C clear)"
@@ -60,22 +68,22 @@ roi_manager.print_zones()
 # cv2.waitKey(0)
 # cv2.destroyAllWindows()
 
-def build_user_mask(zones, img_shape):
-    """
-    Build a mask from the defined zones.
+# def build_user_mask(zones, img_shape):
+#     """
+#     Build a mask from the defined zones.
 
-    Args:
-        zones (list): List of defined zones as lists of points.
-        img_shape (tuple): Shape of the image (height, width).
+#     Args:
+#         zones (list): List of defined zones as lists of points.
+#         img_shape (tuple): Shape of the image (height, width).
 
-    Returns:
-        np.ndarray: Mask with the same shape as the image, where defined zones are filled.
-    """
-    mask = np.zeros(img_shape[:2], dtype=np.uint8)
-    for zone in zones:
-        pts = np.array(zone, np.int32).reshape((-1, 1, 2))  # Reshape for cv2.fillPoly
-        cv2.fillPoly(mask, [pts], 255)
-    return mask
+#     Returns:
+#         np.ndarray: Mask with the same shape as the image, where defined zones are filled.
+#     """
+#     mask = np.zeros(img_shape[:2], dtype=np.uint8)
+#     for zone in zones:
+#         pts = np.array(zone, np.int32).reshape((-1, 1, 2))  # Reshape for cv2.fillPoly
+#         cv2.fillPoly(mask, [pts], 255)
+#     return mask
 
 def box_tensor_to_xyxy(box_tensor):
     """
@@ -88,9 +96,9 @@ def box_tensor_to_xyxy(box_tensor):
         np.ndarray: Array of shape (N, 4) with bounding boxes in xyxy format.
     """
     return box_tensor.cpu().numpy() if isinstance(box_tensor, torch.Tensor) else box_tensor
-
+"""
 def overlap_area(user_mask_bool, box_xyxy):
-    """
+    
     Calculate the overlap area between a user-defined mask and bounding boxes.
 
     Args:
@@ -99,7 +107,7 @@ def overlap_area(user_mask_bool, box_xyxy):
 
     Returns:
         bool: True if there is any overlap, False otherwise.
-    """
+    
     if not user_mask_bool.any():
         return False  # No area of interest defined
 
@@ -124,16 +132,17 @@ def prepare_mask_u8(mask_img, frame_shape):
     if (m.shape[0] != H) or (m.shape[1] != W):
         m = cv2.resize(m, (W, H), interpolation=cv2.INTER_NEAREST)  # keep edges crisp
     return m
+"""
 
 # Example usage
 if roi_manager.zones:
-    user_mask = build_user_mask(roi_manager.zones, im0.shape)
-    user_mask_bool = user_mask.astype(bool)
-    mask_u8 = prepare_mask_u8(user_mask_bool, im0.shape)
-    mask_bool = mask_u8.astype(bool)
-    red_img = np.zeros_like(im0)
-    red_img[:] = (0, 0, 255)  # Red color
-    alpha = 0.20  # Transparency factor
+    #user_mask = roi_manager.build_mask(im0.shape)
+    #user_mask_bool = user_mask.astype(bool)
+    #mask_u8 = prepare_mask_u8(user_mask_bool, im0.shape)
+    #mask_bool = mask_u8.astype(bool)
+    # red_img = np.zeros_like(im0)
+    # red_img[:] = (0, 0, 255)  # Red color
+    # alpha = 0.20  # Transparency factor
 
     stream = cv2.VideoCapture(0)
     # stream = cv2.VideoCapture("./test3.mp4")
@@ -147,12 +156,13 @@ if roi_manager.zones:
     # to_email = "xyz@gmail.com"  # the receiver email address
 
     # Initialize security alarm object
-    securityalarm = solutions.SecurityAlarm(
-        show=True,  # display the output
-        model="yolo11n.pt",  # i.e. yolo11s.pt, yolo11m.pt
-        records=1,  # total detections count to send an email
-        classes=[0],  # i.e. [0] for person, [0, 1] for person and car, etc.
-    )
+    # securityalarm = solutions.AreaInvasion(
+    #     image=im0,
+    #     show=True,  # display the output
+    #     model="yolo11n.pt",  # i.e. yolo11s.pt, yolo11m.pt
+    #     records=1,  # total detections count to send an email
+    #     classes=[0],  # i.e. [0] for person, [0, 1] for person and car, etc.
+    # )
 
     # Process video
     while cap.isOpened():
@@ -162,30 +172,24 @@ if roi_manager.zones:
             print("Video frame is empty or video processing has been successfully completed.")
             break
 
-        results = securityalarm(frame)
+        results = roi_manager(frame)
         out_frame = results.plot_im
 
         
-        blended = cv2.addWeighted(out_frame, 1 - alpha, red_img, alpha, 0)
+        blended = cv2.addWeighted(out_frame, 1 - roi_manager.alpha, roi_manager.overlay, roi_manager.alpha, 0)
 
         out_vis = out_frame.copy()
-        cv2.copyTo(blended, mask_u8, out_vis)
+        cv2.copyTo(blended, roi_manager.mask, out_vis)
 
 
     # print(results)  # access the output
     # cv2.imshow("Security Alarm", results.plot_im)  # display the output frame
         cv2.imshow("Security Alarm", out_vis)
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+                cv2.destroyAllWindows()  # Closes current frame window
 
         video_writer.write(out_frame)  # write the processed frame.
 
 cap.release()
 video_writer.release()
 cv2.destroyAllWindows()  # destroy all opened windows
-    # # Convert bounding boxes to xyxy format
-    # box_xyxy = box_tensor_to_xyxy(results.boxes.xyxy)
-
-    # # Check for overlap
-    # if overlap_area(user_mask_bool, box_xyxy):
-    #     print("Overlap detected with the defined zones.")
-    # else:
-    #     print("No overlap detected with the defined zones.")

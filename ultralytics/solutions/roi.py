@@ -10,9 +10,30 @@ class RegionOfInterest:
         current_zone (list): Points of the zone currently being defined.
     """
 
-    def __init__(self):
+    def __init__(self, image, **kwargs) -> None:
+        """
+        Initialize the RegionOfInterest class with parameters for ROI creation, including mouse event handling, points management, zones handling, image mask generation, and so on.
+
+        Args:
+            image (np.ndarray): The input image or frame to define the ROI on.
+            **kwargs: Additional keyword arguments for ROI properties.
+            overlay (tuple): Color for ROI overlay (default is red).
+            alpha (float): Transparency for overlay (default is 0.3).
+        
+        Examples:
+            >>> roi = RegionOfInterest(image, overlay=(0, 0, 255), alpha=0.3)
+        """
         self.zones = []
         self.current_zone = []
+        self.imageHeight = image.shape[0]
+        self.imageWidth = image.shape[1]
+
+        # ROI Properties
+        self.mask = None       # 0/255 version of the mask
+        self.mask_bool = None  # Boolean version of the mask
+        self.overlay = np.zeros_like(image)
+        self.overlay[:] = kwargs.get('overlay', (0, 0, 255))  # Color for ROI overlay (red)
+        self.alpha = kwargs.get('alpha', 0.3)  # Transparency for overlay
 
     def add_point(self, point):
         """Add a point to the current zone."""
@@ -62,3 +83,17 @@ class RegionOfInterest:
                 print(f"Zone {i}: {zone}")
         else:
             print("No zones selected.")
+
+    # TODO: finer
+    def build_mask(self):
+        """
+        Build a binary mask from the defined zones.
+
+        Returns:
+            np.ndarray: Binary mask with the same shape as the image, where defined zones are filled.
+        """
+        self.mask = np.zeros((self.imageHeight, self.imageWidth), dtype=np.uint8)
+        for zone in self.zones:
+            pts = np.array(zone, np.int32).reshape((-1, 1, 2))  # Reshape for cv2.fillPoly
+            cv2.fillPoly(self.mask, [pts], 255)
+        self.mask_bool = self.mask.astype(bool)

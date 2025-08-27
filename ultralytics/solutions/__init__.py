@@ -17,6 +17,7 @@ from .speed_estimation import SpeedEstimator
 from .streamlit_inference import Inference
 from .trackzone import TrackZone
 from .vision_eye import VisionEye
+from .area_invasion import AreaInvasion
 
 __all__ = (
     "ObjectCounter",
@@ -38,4 +39,5 @@ __all__ = (
     "TrackZone",
     "SearchApp",
     "VisualAISearch",
+    "AreaInvasion"
 )
